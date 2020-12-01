@@ -15,7 +15,7 @@ public class Request {
     public Socket socket;
 
     HashMap<String, String> headers = new HashMap<>();
-    String requestPath;
+    public String path;
     HashMap<String, String> params = new HashMap<>();
     Method method;
 
@@ -24,7 +24,7 @@ public class Request {
         socket = clientSocket;
 
         parseHeaders(inputStream);
-        parseParams(requestPath);
+        parseParams(path);
     }
 
     /**
@@ -36,18 +36,12 @@ public class Request {
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
         try {
             String line = reader.readLine();
-            requestPath = line.split(" ")[1];
+            path = line.split(" ")[1];
             method = Method.valueOf(line.split(" ")[0]);
             while ((line = reader.readLine()) != null && !line.isEmpty()) {
-                String key = line.split(": ")[0];
-                try {
-                    String value = line.split(": ")[1];
-                    headers.put(key, value);
-                } catch (IndexOutOfBoundsException e) {
-                    key = line.split("=")[0]; // for boundary header
-                    String value = line.split("=")[1];
-                    headers.put(key, value);
-                }
+                String header = line.split(": ")[0];
+                String value = line.split(": ")[1];
+                headers.put(header, value);
             }
         } catch (Exception exception) {
             throw new MalformedRequestException("The client request does not follow HTTP protocol.", exception);

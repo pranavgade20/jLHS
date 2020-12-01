@@ -50,12 +50,15 @@ public class Server {
 
                     for (Route route :
                             routes) {
-                        if (route.method != request.method) break;
-                        String requestPath = request.requestPath.split("\\?")[0];
-                        if (Pattern.matches(route.path, requestPath)) {
-                            route.handler.handler(request, response);
-                            handled = true;
-                            break;
+                        if (route.method == request.method) {
+                            String requestPath = request.path.split("\\?")[0];
+                            if (Pattern.matches(route.path, requestPath)) {
+                                route.handler.handler(request, response);
+                                if (response.getStatus() != Response.Status.ENDED_RESPONSE)
+                                    response.end();
+                                handled = true;
+                                break;
+                            }
                         }
                     }
                     if (!handled) {
