@@ -5,7 +5,6 @@ import jLHS.POSTRequestHandler;
 import jLHS.Route;
 import jLHS.Server;
 
-import java.awt.*;
 import java.io.*;
 import java.util.Map;
 
@@ -34,6 +33,31 @@ public class Sample {
                         for (Map.Entry<String, String> entry : request.getParams().entrySet()) {
                             response.print(entry.getKey() + ":" + entry.getValue() + "<br>");
                         }
+                        response.end();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+
+        server.on(Method.POST,
+                "/post",
+                (request, response) -> {
+                    try {
+                        POSTRequestHandler h = new POSTRequestHandler(request);
+                        InputStreamReader isr = new InputStreamReader(h.getFormData("data").resourceStream);
+//                        isr.transferTo(new OutputStreamWriter(System.out));
+                        BufferedReader reader = new BufferedReader(isr);
+                        String l = reader.readLine();
+                        System.out.println(l);
+//                        request.getRequestReader().transferTo(new OutputStreamWriter(System.out));
+                        String line;
+                        response.print("hi");
+
+//                        System.out.println("=========================");
+//                        while ((line = request.getRequestReader().readLine()) != null && !line.isEmpty()) {
+//                            System.out.println(line);
+//                        }
+//                        System.out.println("=========================");
                         response.end();
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -88,7 +112,7 @@ public class Sample {
 //                        String line;
 //                        while ((line = reader.readLine()) != null) response.print(line);
 //                        response.end();
-                        request.getStream().transferTo(System.out);
+//                        request.getStream().transferTo(System.out);
                         response.print("OK");
                         response.end();
                     } catch (Exception e) {

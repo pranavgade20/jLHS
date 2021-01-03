@@ -3,15 +3,12 @@ package jLHS;
 import jLHS.exceptions.MalformedRequestException;
 import jLHS.exceptions.URLFormatException;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.Socket;
 import java.util.HashMap;
 
 public class Request {
-    private InputStream inputStream;
+    private BufferedReader requestReader;
     public Socket socket;
 
     HashMap<String, String> headers = new HashMap<>();
@@ -20,25 +17,31 @@ public class Request {
     Method method;
 
     public Request(Socket clientSocket) throws IOException, MalformedRequestException, URLFormatException {
-        inputStream = clientSocket.getInputStream();
+        requestReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
         socket = clientSocket;
+        
+        try {
+            String line = requestReader.readLine();
+            path = line.split(" ")[1];
+            method = Method.valueOf(line.split(" ")[0]);
 
-        parseHeaders(inputStream);
-        parseParams(path);
+            parseParams(path);
+        } catch (Exception exception) {
+            throw new MalformedRequestException("The client request does not follow HTTP protocol.", exception);
+        }
+
+        parseHeaders(requestReader);
     }
 
     /**
      * Parses the headers of this http request.
-     * @param inputStream
+     * @param requestReader
      * @throws MalformedRequestException
      */
-    private void parseHeaders(InputStream inputStream) throws MalformedRequestException{
-        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+    private void parseHeaders(BufferedReader requestReader) throws MalformedRequestException{
         try {
-            String line = reader.readLine();
-            path = line.split(" ")[1];
-            method = Method.valueOf(line.split(" ")[0]);
-            while ((line = reader.readLine()) != null && !line.isEmpty()) {
+            String line;
+            while ((line = requestReader.readLine()) != null && !line.isEmpty()) {
                 String header = line.split(": ")[0];
                 String value = line.split(": ")[1];
                 headers.put(header, value);
@@ -71,8 +74,8 @@ public class Request {
         }
     }
 
-    public InputStream getStream() {
-        return inputStream;
+    public BufferedReader getRequestReader() {
+        return requestReader;
     }
 
     public String getHeader(String header) {
