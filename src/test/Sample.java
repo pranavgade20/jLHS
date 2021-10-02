@@ -44,13 +44,8 @@ public class Sample {
                     try {
                         var data = request.getRequestReader().getFormData("a").orElseThrow();
                         data.getFormData().transferTo(System.out);
-                        response.print("hi");
+                        response.print("OK");
 
-//                        System.out.println("=========================");
-//                        while ((line = request.getRequestReader().readLine()) != null && !line.isEmpty()) {
-//                            System.out.println(line);
-//                        }
-//                        System.out.println("=========================");
                         response.end();
                     } catch (Exception e) {
                         e.printStackTrace();

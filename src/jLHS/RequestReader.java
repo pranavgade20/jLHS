@@ -35,7 +35,7 @@ public class RequestReader extends BufferedInputStream {
     Method method;
 
 
-    public RequestReader(@NotNull InputStream in) throws MalformedRequestException, ProtocolFormatException {
+    public RequestReader(@NotNull InputStream in) throws MalformedRequestException, ProtocolFormatException, IOException {
         super(in);
         try {
             String line = readLine();
@@ -98,7 +98,7 @@ public class RequestReader extends BufferedInputStream {
     long read_content_count = 0;
     private String boundary;
     private HashMap<String, FormData> cache = new HashMap<>();
-    public void parseFormData() throws ProtocolFormatException {
+    public void parseFormData() throws ProtocolFormatException, IOException {
         try {
             boundary = "--" + headers.get("Content-Type").split("=")[1];
         } catch (Exception e) {
@@ -109,7 +109,10 @@ public class RequestReader extends BufferedInputStream {
         } catch (Exception e) {
             throw new ProtocolFormatException("Malformed headers: Expected header describing the length of data being sent. Chunked encoding is not supported yet.", e);
         }
+        read_content_count = 0;
 
+        String line = readLine();
+        while (!line.equals(boundary)) line = readLine();
 //        try {
 //
 //        } catch (Exception e) {
@@ -122,15 +125,14 @@ public class RequestReader extends BufferedInputStream {
         for (FormData formData : cache.values()) {
             formData.getFormData().fillCompletely();
         }
-        while (content_length-2 > read_content_count) {
-            String line = readLine();
-            while (!line.equals(boundary)) line = readLine();
+        while (read_content_count < content_length) {
             HashMap<String, String> headers = new HashMap<>();
+            String line;
             while (!(line = readLine()).isEmpty()) {
                 String[] h = line.split(": ");
                 headers.put(h[0], h[1]);
             }
-            FormData formData = new FormData(headers, new FormDataInputStream((boundary + "\r\n").getBytes(StandardCharsets.US_ASCII)));
+            FormData formData = new FormData(headers, new FormDataInputStream((boundary).getBytes(StandardCharsets.US_ASCII)));
 
             if (!headers.containsKey("Content-Disposition"))
                 throw new ProtocolFormatException("Malformed headers: Expected header describing the type of content.", null);
@@ -220,19 +222,21 @@ public class RequestReader extends BufferedInputStream {
                     pos = 0;
                 }
                 if (RequestReader.this.count == RequestReader.this.pos) {
+                    if (RequestReader.this.read_content_count == RequestReader.this.content_length) return;
                     int read = RequestReader.this.read();
+                    RequestReader.this.read_content_count++;
                     if (read == -1) throw new IOException("Can't read more bytes.");
                     buf[count++] = (byte) read;
-                    RequestReader.this.read_content_count++;
                 } else {
                     int len = Math.min(max_bytes, Math.min(buf.length - count, RequestReader.this.count - RequestReader.this.pos));
                     System.arraycopy(RequestReader.this.buf, RequestReader.this.pos, buf, count, len);
                     RequestReader.this.pos += len;
-                    count += len;
                     RequestReader.this.read_content_count += len;
+                    count += len;
                 }
             }
         }
+        boolean trailerRead = false;
         @Override
         public int read() throws IOException {
             synchronized (buf) {
@@ -254,6 +258,12 @@ public class RequestReader extends BufferedInputStream {
                         }
                     }
                     // we have a match
+                    if (!trailerRead) {
+                        trailerRead = true;
+                        RequestReader.this.read(); // get rid of trailing \r\n or --
+                        RequestReader.this.read();
+                        RequestReader.this.read_content_count += 2;
+                    }
                     return -1;
                 }
                 this.pos++;
