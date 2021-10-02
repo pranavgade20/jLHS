@@ -100,7 +100,7 @@ public class RequestReader extends BufferedInputStream {
     private HashMap<String, FormData> cache = new HashMap<>();
     public void parseFormData() throws ProtocolFormatException {
         try {
-            boundary = headers.get("Content-Type").split("=")[1];
+            boundary = "--" + headers.get("Content-Type").split("=")[1];
         } catch (Exception e) {
             throw new ProtocolFormatException("Malformed headers: Expected header describing the boundary of data being sent.", e);
         }
@@ -122,7 +122,7 @@ public class RequestReader extends BufferedInputStream {
         for (FormData formData : cache.values()) {
             formData.getFormData().fillCompletely();
         }
-        while (content_length > read_content_count) {
+        while (content_length-2 > read_content_count) {
             String line = readLine();
             while (!line.equals(boundary)) line = readLine();
             HashMap<String, String> headers = new HashMap<>();
@@ -137,8 +137,8 @@ public class RequestReader extends BufferedInputStream {
             String[] content_disposition = headers.get("Content-Disposition").split("; ");
             String content_name = Arrays.stream(content_disposition).filter(s -> s.startsWith("name=\"")).findAny().orElseThrow();
             content_name = content_name.substring("name=\"".length(), content_name.length() - 1);
+            cache.put(content_name, formData);
             if (content_name.equals(name)) {
-                cache.put(content_name, formData);
                 return Optional.of(formData);
             } else {
                 formData.getFormData().fillCompletely();
