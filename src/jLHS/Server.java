@@ -50,8 +50,8 @@ public class Server {
 
                     for (Route route :
                             routes) {
-                        if (route.method == request.method) {
-                            String requestPath = request.path.split("\\?")[0];
+                        if (route.method == request.getMethod()) {
+                            String requestPath = request.getPath().split("\\?")[0];
                             if (Pattern.matches(route.path, requestPath)) {
                                 route.handler.handler(request, response);
                                 if (response.getStatus() != Response.Status.ENDED_RESPONSE)

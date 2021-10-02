@@ -1,7 +1,6 @@
 package test;
 
 import jLHS.Method;
-import jLHS.POSTRequestHandler;
 import jLHS.Route;
 import jLHS.Server;
 
@@ -43,14 +42,8 @@ public class Sample {
                 "/post",
                 (request, response) -> {
                     try {
-                        POSTRequestHandler h = new POSTRequestHandler(request);
-                        InputStreamReader isr = new InputStreamReader(h.getFormData("data").resourceStream);
-//                        isr.transferTo(new OutputStreamWriter(System.out));
-                        BufferedReader reader = new BufferedReader(isr);
-                        String l = reader.readLine();
-                        System.out.println(l);
-//                        request.getRequestReader().transferTo(new OutputStreamWriter(System.out));
-                        String line;
+                        var data = request.getRequestReader().getFormData("a").orElseThrow();
+                        data.getFormData().transferTo(System.out);
                         response.print("hi");
 
 //                        System.out.println("=========================");
@@ -68,7 +61,7 @@ public class Sample {
                 Route.DEFAULT,
                 ((request, response) -> {
                     try {
-                        File file = new File(request.path);
+                        File file = new File(request.getPath());
                         if (!file.exists()) {
                             response.setCode(404, "Not Found");
                             response.writeHeader("content-type", "text/html");
@@ -108,11 +101,12 @@ public class Sample {
                 ((request, response) -> {
                     try {
 //                        POSTRequestHandler handler = new POSTRequestHandler(request);
+//                        BufferedReader reader = new BufferedReader(new InputStreamReader(request.socket.getInputStream()));
 //                        BufferedReader reader = new BufferedReader(new InputStreamReader(handler.getFormData("filetoupload").resourceStream));
 //                        String line;
-//                        while ((line = reader.readLine()) != null) response.print(line);
+//                        while ((line = reader.readLine()) != null) System.out.println(line);
 //                        response.end();
-//                        request.getStream().transferTo(System.out);
+//                        request.socket.getInputStream().transferTo(System.out);
                         response.print("OK");
                         response.end();
                     } catch (Exception e) {
