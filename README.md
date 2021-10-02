@@ -6,9 +6,7 @@ jLHS(jLHS Light HTTP Server) is a fast and tiny HTTP server written in Java with
 
 - HTTP 1.1 support
 - Supports SSL(https)
-- Limited support for parameter&headers parsing in GET requests, to be extended to POST soon.
-- Supports custom handlers to allow you to write implementations according to your needs.
-- Will soon support file upload via POST requests.
+- support for GET and POST requests. Others like PUT, DELETE, etc have limited support.
 
 ## Example
 
@@ -55,6 +53,20 @@ server.on(Method.GET,
             }
         }));
 server.start();
+
+// test the following with ` curl --form "x=ignored_message" --form "a=test_message" localhost:8080/`
+server.on(Method.POST,
+        "/",
+        (request, response) -> {
+            try {
+                var data = request.getRequestReader().getFormData("a").orElseThrow();
+                data.getFormData().transferTo(System.out);
+                response.print("OK");
+                response.end();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
 ```
 
 ### Documentation & Tests
