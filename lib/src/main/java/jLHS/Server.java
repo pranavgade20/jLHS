@@ -9,12 +9,16 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.KeyStore;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 public class Server {
     private ServerSocket serverSocket;
     private Thread serverThread;
     private ArrayList<Route> routes;
+    private HashSet<String> defaultHeaders = new HashSet<>();
 
     public Server(int port) throws IOException {
         serverSocket = new ServerSocket(port);
@@ -39,13 +43,21 @@ public class Server {
         ((SSLServerSocket)serverSocket).setNeedClientAuth(false);
     }
 
+    public void addDefaultHeaders(Collection<String> defaultHeaders) {
+        this.defaultHeaders.addAll(defaultHeaders);
+    }
+
+    public HashSet<String> getDefaultHeaders() {
+        return defaultHeaders;
+    }
+
     public void start() {
         serverThread = new Thread(() -> {
-            while (true) {
+            while (!Thread.interrupted()) {
                 try {
                     Socket client = serverSocket.accept();
                     Request request = new Request(client);
-                    Response response = new Response(client);
+                    Response response = new Response(client, defaultHeaders);
                     boolean handled = false;
 
                     for (Route route :
@@ -67,6 +79,8 @@ public class Server {
                         response.print("Error 404 : The requested url was not found on the server.");
                         response.end();
                     }
+                } catch (ThreadDeath e) {
+                    // stopped the thread
                 } catch (Exception exception) {
                     exception.printStackTrace();
                 }
@@ -76,8 +90,10 @@ public class Server {
     }
 
     @Deprecated
-    public void stop() {
+    public void stop() throws IOException {
+        serverThread.interrupt();
         serverThread.stop();
+        serverSocket.close();
     }
 
     public void on(Method method, String path, ConnectionHandler handler) {

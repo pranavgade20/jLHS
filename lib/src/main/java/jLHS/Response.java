@@ -4,21 +4,55 @@ import jLHS.exceptions.ProtocolFormatException;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.HashMap;
+import java.util.HashSet;
 
 public class Response {
     private OutputStream outputStream;
     private PrintWriter writer = null;
     private Status status = Status.WRITING_RESPONSE_CODE;
+    private final HashSet<String> defaultHeaders;
 
     public Response(Socket clientSocket) throws IOException {
-        outputStream = clientSocket.getOutputStream();
+        this(clientSocket, new HashSet<>());
     }
 
+    public Response(Socket clientSocket, HashSet<String> defaultHeaders) throws IOException {
+        outputStream = clientSocket.getOutputStream();
+        this.defaultHeaders = defaultHeaders;
+    }
+
+    public void addDefaultHeader(String headerName, String value) {
+        addDefaultHeader(headerName + ": " + value);
+    }
+
+    public void addDefaultHeader(String header) {
+        synchronized (defaultHeaders) {
+            defaultHeaders.add(header);
+        }
+    }
+
+    public HashSet<String> getDefaultHeaders() {
+        return defaultHeaders;
+    }
     /**
      * Get the associated OutputStream. It is recommended that you use a handler to perform operations on this stream.
      * @return the associated OutputStream.
      */
-    public OutputStream getOutputStream() {
+    public OutputStream getOutputStream() throws ProtocolFormatException {
+        if (status == Status.WRITING_HEADERS) {
+            writer.write("\r\n");
+            status = Status.WRITING_BODY;
+        }
+
+        if (status.compareTo(Status.WRITING_BODY) > 0)
+            throw new ProtocolFormatException("Body already written.", null);
+        if (status.compareTo(Status.WRITING_BODY) < 0) {
+            setCode(200, "OK");
+            writer.write("\r\n\r\n");
+            status = Status.WRITING_BODY; //skipping writing headers
+        }
+
         return outputStream;
     }
 
@@ -33,12 +67,19 @@ public class Response {
             throw new ProtocolFormatException("Response code already set", null);
 
         if (writer == null) {
-            writer = new PrintWriter(new DataOutputStream(outputStream));
+            writer = new PrintWriter(outputStream);
         }
 
         writer.write("HTTP/1.1 " + statusCode + " " + status);
         writer.write("\r\n");
         this.status = Status.WRITING_HEADERS;
+        synchronized (defaultHeaders) {
+            // write default headers
+            for (String header : defaultHeaders) {
+                writer.write(header);
+                writer.write("\r\n");
+            }
+        }
     }
 
     public void writeHeader(String headerName, String value) throws ProtocolFormatException {
@@ -59,7 +100,7 @@ public class Response {
      * Writes the given string to the response.
      * @param str
      */
-    public void print(String str) throws ProtocolFormatException {
+    public void print(String str) throws ProtocolFormatException, IOException {
         if (status == Status.WRITING_HEADERS) {
             writer.write("\r\n");
             status = Status.WRITING_BODY;
@@ -74,6 +115,31 @@ public class Response {
         }
 
         writer.write(str);
+        writer.flush();
+        outputStream.flush();
+    }
+
+    /**
+     * Transfers the given stream to the response.
+     * @param is
+     */
+    public void write(InputStream is) throws ProtocolFormatException, IOException {
+        if (status == Status.WRITING_HEADERS) {
+            writer.write("\r\n");
+            status = Status.WRITING_BODY;
+        }
+
+        if (status.compareTo(Status.WRITING_BODY) > 0)
+            throw new ProtocolFormatException("Body already written.", null);
+        if (status.compareTo(Status.WRITING_BODY) < 0) {
+            setCode(200, "OK");
+            writer.write("\r\n\r\n");
+            status = Status.WRITING_BODY; //skipping writing headers
+        }
+
+        writer.flush();
+        is.transferTo(outputStream);
+        outputStream.flush();
     }
 
     /**
