@@ -3,7 +3,6 @@ package jLHS;
 import jLHS.exceptions.MalformedRequestException;
 import jLHS.exceptions.ProtocolFormatException;
 import jLHS.exceptions.URLFormatException;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -35,7 +34,7 @@ public class RequestReader extends BufferedInputStream {
     Method method;
 
 
-    public RequestReader(@NotNull InputStream in) throws MalformedRequestException, ProtocolFormatException, IOException {
+    public RequestReader(InputStream in) throws MalformedRequestException, ProtocolFormatException, IOException {
         super(in);
         try {
             String line = readLine();

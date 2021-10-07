@@ -25,6 +25,21 @@ server.on(Method.GET, // method
                 e.printStackTrace();
             }
         });
+        
+// test the following with ` curl --form "x=ignored_message" --form "a=test_message" localhost:8080/`
+server.on(Method.POST,
+        "/",
+        (request, response) -> {
+            try {
+                // get the form data with name "a"
+                var data = request.getRequestReader().getFormData("a").orElseThrow();
+                data.getFormData().transferTo(System.out); // write to stdout
+                response.print("OK"); // send a response
+                response.end();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
 
 server.on(Method.GET,
         "/params",
@@ -54,19 +69,7 @@ server.on(Method.GET,
         }));
 server.start();
 
-// test the following with ` curl --form "x=ignored_message" --form "a=test_message" localhost:8080/`
-server.on(Method.POST,
-        "/",
-        (request, response) -> {
-            try {
-                var data = request.getRequestReader().getFormData("a").orElseThrow();
-                data.getFormData().transferTo(System.out);
-                response.print("OK");
-                response.end();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+
 ```
 
 ### Documentation & Tests
