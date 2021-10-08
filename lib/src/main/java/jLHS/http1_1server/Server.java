@@ -74,7 +74,7 @@ public class Server implements jLHS.Server {
                                 if (route.method == request.getMethod()) {
                                     String requestPath = request.getPath().split("\\?")[0];
                                     if (Pattern.matches(route.path, requestPath)) {
-                                        if (request.getHeaders().get("Expect").equals("100-continue")) {
+                                        if ("100-continue".equals(request.getHeaders().get("Expect"))) {
                                             client.getOutputStream().write("HTTP/1.1 100 Continue\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
                                             client.getOutputStream().flush();
                                         }
