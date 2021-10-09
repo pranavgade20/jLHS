@@ -2,18 +2,23 @@ package jLHS.http1_1server;
 
 import jLHS.exceptions.ProtocolFormatException;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 
 public class Response implements jLHS.Response {
     protected OutputStream outputStream;
     protected PrintWriter writer = null;
+    protected PrintWriter headerWriter = null;
     protected Status status = Status.WRITING_RESPONSE_CODE;
     protected final HashSet<String> defaultHeaders;
+    protected ByteArrayOutputStream buf = new ByteArrayOutputStream();
+    /**
+     * buf might be flushed if it's size exceeds this. This is done mostly to prevent large files from
+     * taking forever to be sent because they are cached in memory.
+     */
+    protected long default_buf_limit = 8*1024;
 
     public Response(Socket clientSocket) throws IOException {
         this(clientSocket, new HashSet<>());
@@ -37,26 +42,6 @@ public class Response implements jLHS.Response {
     public HashSet<String> getDefaultHeaders() {
         return defaultHeaders;
     }
-    /**
-     * Get the associated OutputStream. It is recommended that you use a handler to perform operations on this stream.
-     * @return the associated OutputStream.
-     */
-    public OutputStream getOutputStream() throws ProtocolFormatException {
-        if (status == Status.WRITING_HEADERS) {
-            writer.write("\r\n");
-            status = Status.WRITING_BODY;
-        }
-
-        if (status.compareTo(Status.WRITING_BODY) > 0)
-            throw new ProtocolFormatException("Body already written.", null);
-        if (status.compareTo(Status.WRITING_BODY) < 0) {
-            setCode(200, "OK");
-            writer.write("\r\n\r\n");
-            status = Status.WRITING_BODY; //skipping writing headers
-        }
-
-        return outputStream;
-    }
 
     /**
      * Sets the response code of the request. You can call this method only once per connection.
@@ -68,18 +53,18 @@ public class Response implements jLHS.Response {
         if (this.status != Status.WRITING_RESPONSE_CODE)
             throw new ProtocolFormatException("Response code already set", null);
 
-        if (writer == null) {
-            writer = new PrintWriter(outputStream);
-        }
+        if (writer == null) writer = new PrintWriter(buf);
+        if (headerWriter == null) headerWriter = new PrintWriter(outputStream);
 
-        writer.write("HTTP/1.1 " + statusCode + " " + status);
-        writer.write("\r\n");
+        headerWriter.write("HTTP/1.1 " + statusCode + " " + status);
+        headerWriter.write("\r\n");
         this.status = Status.WRITING_HEADERS;
+        headerWriter.write("Transfer-Encoding: chunked\r\n");
         synchronized (defaultHeaders) {
             // write default headers
             for (String header : defaultHeaders) {
-                writer.write(header);
-                writer.write("\r\n");
+                headerWriter.write(header);
+                headerWriter.write("\r\n");
             }
         }
     }
@@ -94,8 +79,8 @@ public class Response implements jLHS.Response {
         if (status.compareTo(Status.WRITING_HEADERS) < 0)
             setCode(200, "OK");
 
-        writer.write(header);
-        writer.write("\r\n");
+        headerWriter.write(header);
+        headerWriter.write("\r\n");
     }
 
     /**
@@ -104,7 +89,9 @@ public class Response implements jLHS.Response {
      */
     public void print(String str) throws ProtocolFormatException, IOException {
         if (status == Status.WRITING_HEADERS) {
-            writer.write("\r\n");
+            headerWriter.write("\r\n");
+            headerWriter.flush();
+            outputStream.flush();
             status = Status.WRITING_BODY;
         }
 
@@ -112,13 +99,14 @@ public class Response implements jLHS.Response {
             throw new ProtocolFormatException("Body already written.", null);
         if (status.compareTo(Status.WRITING_BODY) < 0) {
             setCode(200, "OK");
-            writer.write("\r\n\r\n");
+            headerWriter.write("\r\n\r\n");
+            headerWriter.flush();
+            outputStream.flush();
             status = Status.WRITING_BODY; //skipping writing headers
         }
 
         writer.write(str);
-        writer.flush();
-        outputStream.flush();
+        if (buf.size() > default_buf_limit) flush();
     }
 
     /**
@@ -127,7 +115,9 @@ public class Response implements jLHS.Response {
      */
     public void write(InputStream is) throws ProtocolFormatException, IOException {
         if (status == Status.WRITING_HEADERS) {
-            writer.write("\r\n");
+            headerWriter.write("\r\n");
+            headerWriter.flush();
+            outputStream.flush();
             status = Status.WRITING_BODY;
         }
 
@@ -135,13 +125,20 @@ public class Response implements jLHS.Response {
             throw new ProtocolFormatException("Body already written.", null);
         if (status.compareTo(Status.WRITING_BODY) < 0) {
             setCode(200, "OK");
-            writer.write("\r\n\r\n");
+            headerWriter.write("\r\n\r\n");
+            headerWriter.flush();
+            outputStream.flush();
             status = Status.WRITING_BODY; //skipping writing headers
         }
 
         writer.flush();
-        is.transferTo(outputStream);
-        outputStream.flush();
+
+        int read;
+        for(byte[] buffer = new byte[8192]; (read = is.read(buffer, 0, 8192)) >= 0;) {
+            buf.write(buffer, 0, read);
+            if (buf.size() > default_buf_limit) flush();
+        }
+        if (buf.size() > default_buf_limit) flush();
     }
 
     /**
@@ -160,9 +157,9 @@ public class Response implements jLHS.Response {
                 end();
                 break;
             case WRITING_BODY:
-                writer.write("\r\n\r\n");
                 flush();
-                outputStream.close();
+                outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                outputStream.flush();
                 status = Status.ENDED_RESPONSE;
                 break;
             case ENDED_RESPONSE:
@@ -177,6 +174,11 @@ public class Response implements jLHS.Response {
     public void flush() throws IOException {
         if (status == Status.ENDED_RESPONSE) return;
         writer.flush();
+        if (buf.size() == 0) return;
+        outputStream.write((Integer.toString(buf.size(), 16) + "\r\n").getBytes(StandardCharsets.US_ASCII));
+        buf.writeTo(outputStream);
+        buf.reset();
+        outputStream.write("\r\n".getBytes());
         outputStream.flush();
     }
 

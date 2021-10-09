@@ -167,14 +167,16 @@ public class RequestReader extends BufferedInputStream implements jLHS.RequestRe
 
     String readLine() throws IOException {
         StringBuilder s = new StringBuilder(50);
-        char prev = (char) read();
-        char curr = (char) read();
+        int read;
+        char prev = (char) (read = read());
+        char curr = (char) (read = read());
         RequestReader.this.read_content_count += 2;
         while (prev != '\r' && curr != '\n') {
+            if (read == -1) throw new IOException("Reached end of stream");
             s.append(prev);
             prev = curr;
             if (this.pos >= this.count) {
-                curr = (char) read(); // makes it call fill(), I wish there was a better way here
+                curr = (char) (read = read()); // makes it call fill(), I wish there was a better way here
             } else {
                 curr = (char) buf[this.pos++];
             }

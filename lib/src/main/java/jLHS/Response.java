@@ -7,7 +7,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 public interface Response {
-    OutputStream getOutputStream() throws ProtocolFormatException;
     void setCode(int statusCode, String status) throws ProtocolFormatException;
         default void writeHeader(String headerName, String value) throws ProtocolFormatException {
         writeHeader(headerName + ": " + value);

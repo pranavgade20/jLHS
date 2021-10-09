@@ -190,14 +190,16 @@ public class RequestReader implements jLHS.RequestReader {
 
     String readLine() throws IOException {
         StringBuilder s = new StringBuilder(50);
-        char prev = (char) inputStream.read();
-        char curr = (char) inputStream.read();
+        int read;
+        char prev = (char) (read = inputStream.read());
+        char curr = (char) (read = inputStream.read());
         RequestReader.this.read_content_count += 2;
         while (prev != '\r' && curr != '\n') {
+            if (read == -1) throw new IOException("Reached end of stream");
             s.append(prev);
             prev = curr;
             if (inputStream.getPos() >= inputStream.getCount()) {
-                curr = (char) inputStream.read(); // makes it call fill(), I wish there was a better way here
+                curr = (char) (read = inputStream.read()); // makes it call fill(), I wish there was a better way here
             } else {
                 curr = (char) inputStream.getBuf()[inputStream.getPos()];
                 inputStream.setPos(inputStream.getPos()+1);
