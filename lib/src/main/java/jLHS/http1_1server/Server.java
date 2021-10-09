@@ -86,6 +86,7 @@ public class Server implements jLHS.Server {
                                     }
                                 }
                             }
+
                             if (!handled) {
                                 response.setCode(404, "Not Found");
                                 response.writeHeader("content-type", "text/html");
