@@ -179,7 +179,8 @@ public class Response implements jLHS.Response {
                 break;
             case WRITING_BODY:
                 flush();
-                outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                if (chunked) outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                else outputStream.write("\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
                 outputStream.flush();
                 status = Status.ENDED_RESPONSE;
                 break;
@@ -201,11 +202,10 @@ public class Response implements jLHS.Response {
             buf.writeTo(outputStream);
             buf.reset();
             outputStream.write("\r\n".getBytes());
-            outputStream.flush();
         } else {
             directWriter.flush();
-            outputStream.flush();
         }
+        outputStream.flush();
     }
 
     @Override
