@@ -129,6 +129,7 @@ public class Response implements jLHS.Response {
      */
     public void write(InputStream is) throws ProtocolFormatException, IOException {
         if (status == Status.WRITING_HEADERS) {
+            if (chunked) directWriter.write("Transfer-Encoding: chunked\r\n");
             directWriter.write("\r\n");
             directWriter.flush();
             outputStream.flush();
