@@ -15,17 +15,15 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.NoSuchElementException;
+import java.util.*;
 import java.util.regex.Pattern;
 
 public class Server implements jLHS.Server {
-    protected ServerSocket serverSocket;
-    protected Thread serverThread;
+    protected final ServerSocket serverSocket;
+    protected final LinkedList<Thread> serverThreads = new LinkedList<>();
     protected ArrayList<Route> routes;
     protected HashSet<String> defaultHeaders = new HashSet<>();
+    public int MAX_CONCURRENT_CONNECTIONS = 8;
 
     public Server(int port) throws IOException {
         serverSocket = new ServerSocket(port);
@@ -60,10 +58,46 @@ public class Server implements jLHS.Server {
 
     @Override
     public void start() {
-        serverThread = new Thread(() -> {
+        start(MAX_CONCURRENT_CONNECTIONS);
+    }
+
+    public void start(int concurrent_connections) {
+        for (int i = 0; i < concurrent_connections; i++) {
+            Thread thread = new ServerThread();
+            synchronized (serverThreads) {
+                serverThreads.add(thread);
+            }
+            thread.start();
+        }
+    }
+
+    @Deprecated
+    @Override
+    public void stop() throws IOException {
+        synchronized (serverThreads) {
+            serverThreads.forEach(t -> {
+                t.interrupt();
+                t.stop();
+            });
+            serverThreads.clear();
+        }
+        serverSocket.close();
+    }
+
+    @Override
+    public void on(Method method, String path, ConnectionHandler handler) {
+        routes.add(new Route(method, path.split("\\?")[0], handler));
+    }
+
+    class ServerThread extends Thread {
+        @Override
+        public void run() {
             while (!Thread.interrupted()) {
                 try {
-                    Socket client = serverSocket.accept();
+                    Socket client;
+                    synchronized (serverSocket) {
+                        client = serverSocket.accept();
+                    }
                     RequestBuilder builder = new RequestBuilder(client);
                     try {
                         for (Request request : builder) {
@@ -98,7 +132,7 @@ public class Server implements jLHS.Server {
                     } catch (NoSuchElementException | IOException | ProtocolFormatException e) {
                         new PrintWriter(client.getOutputStream()).print(
                                 "HTTP/1.1 500 Internal Server Error\r\n" +
-                                "Connection: close\r\n\r\n"
+                                        "Connection: close\r\n\r\n"
                         );
                         client.close();
                     }
@@ -107,22 +141,15 @@ public class Server implements jLHS.Server {
                     // stopped the thread
                 } catch (Exception exception) {
                     exception.printStackTrace();
+                    if (serverSocket.isClosed()) return;
+                    Thread thread = new ServerThread();
+                    synchronized (serverThreads) {
+                        serverThreads.remove(this);
+                        serverThreads.add(thread);
+                    }
+                    thread.start();
                 }
             }
-        });
-        serverThread.start();
-    }
-
-    @Deprecated
-    @Override
-    public void stop() throws IOException {
-        serverThread.interrupt();
-        serverThread.stop();
-        serverSocket.close();
-    }
-
-    @Override
-    public void on(Method method, String path, ConnectionHandler handler) {
-        routes.add(new Route(method, path.split("\\?")[0], handler));
+        }
     }
 }
