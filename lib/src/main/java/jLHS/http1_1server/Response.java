@@ -95,6 +95,7 @@ public class Response implements jLHS.Response {
         if (status.compareTo(Status.WRITING_BODY) < 0) {
             setCode(200, "OK");
             print(str);
+            return;
         }
 
         writer.write(str);
