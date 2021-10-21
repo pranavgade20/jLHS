@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.util.*;
@@ -129,6 +130,7 @@ public class Server implements jLHS.Server {
                             }
                             response.flush();
                         }
+                    } catch (SocketException ignored) {
                     } catch (NoSuchElementException | IOException | ProtocolFormatException e) {
                         new PrintWriter(client.getOutputStream()).print(
                                 "HTTP/1.1 500 Internal Server Error\r\n" +
