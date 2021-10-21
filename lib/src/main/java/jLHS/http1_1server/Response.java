@@ -2,17 +2,18 @@ package jLHS.http1_1server;
 
 import jLHS.exceptions.ProtocolFormatException;
 import jLHS.writers.ChunkedOutputStream;
+import jLHS.writers.GzipOutputStream;
 import jLHS.writers.SimpleOutputStream;
 
 import java.io.*;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 
 public class Response implements jLHS.Response {
     private OutputStream clientStream;
     protected SimpleOutputStream outputStream;
     protected boolean chunked = true;
+    public boolean gzip = false;
     protected PrintWriter writer;
     protected Status status = Status.WRITING_RESPONSE_CODE;
     protected final HashSet<String> defaultHeaders;
@@ -83,11 +84,13 @@ public class Response implements jLHS.Response {
      */
     public void print(String str) throws ProtocolFormatException, IOException {
         if (status == Status.WRITING_HEADERS) {
-            if (chunked) writer.write("Transfer-Encoding: chunked\r\n");
+            if (gzip && chunked) writer.write("Transfer-Encoding: gzip, chunked\r\n");
+            else if (chunked) writer.write("Transfer-Encoding: chunked\r\n");
             writer.write("\r\n");
             writer.flush();
             status = Status.WRITING_BODY;
-            if (chunked) writer = new PrintWriter(outputStream = new ChunkedOutputStream(clientStream));
+            if (gzip && chunked) writer = new PrintWriter(outputStream = new GzipOutputStream(new ChunkedOutputStream(clientStream)));
+            else if (chunked) writer = new PrintWriter(outputStream = new ChunkedOutputStream(clientStream));
         }
 
         if (status.compareTo(Status.WRITING_BODY) > 0)
@@ -107,11 +110,13 @@ public class Response implements jLHS.Response {
      */
     public void write(InputStream is) throws ProtocolFormatException, IOException {
         if (status == Status.WRITING_HEADERS) {
-            if (chunked) writer.write("Transfer-Encoding: chunked\r\n");
+            if (gzip && chunked) writer.write("Transfer-Encoding: gzip, chunked\r\n");
+            else if (chunked) writer.write("Transfer-Encoding: chunked\r\n");
             writer.write("\r\n");
             writer.flush();
             status = Status.WRITING_BODY;
-            if (chunked) writer = new PrintWriter(outputStream = new ChunkedOutputStream(outputStream));
+            if (gzip && chunked) writer = new PrintWriter(outputStream = new GzipOutputStream(new ChunkedOutputStream(clientStream)));
+            else if (chunked) writer = new PrintWriter(outputStream = new ChunkedOutputStream(clientStream));
         }
 
         if (status.compareTo(Status.WRITING_BODY) > 0)
