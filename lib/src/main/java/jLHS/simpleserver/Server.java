@@ -15,7 +15,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.regex.Pattern;
 
-public class Server implements jLHS.Server {
+public class Server implements jLHS.Server<ConnectionHandler> {
     protected ServerSocket serverSocket;
     protected Thread serverThread;
     protected ArrayList<Route> routes;
@@ -99,7 +99,7 @@ public class Server implements jLHS.Server {
     }
 
     @Override
-    public void on(Method method, String path, jLHS.ConnectionHandler handler) {
+    public void on(Method method, String path, ConnectionHandler handler) {
         routes.add(new Route(method, path.split("\\?")[0], handler));
     }
 }

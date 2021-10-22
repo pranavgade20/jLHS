@@ -12,8 +12,8 @@ public class Test {
 
         server.on(Method.GET, "/k", ((request, response) -> {
             try {
-                ((Response)response).gzip = true;
-                response.print("asdf\n");
+                response.gzip = true;
+                response.print("aaaa\n");
                 response.end();
             } catch (ProtocolFormatException | IOException e) {
                 e.printStackTrace();

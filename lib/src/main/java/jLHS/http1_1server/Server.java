@@ -1,6 +1,5 @@
 package jLHS.http1_1server;
 
-import jLHS.ConnectionHandler;
 import jLHS.Method;
 import jLHS.Route;
 import jLHS.exceptions.ProtocolFormatException;
@@ -19,7 +18,7 @@ import java.security.KeyStore;
 import java.util.*;
 import java.util.regex.Pattern;
 
-public class Server implements jLHS.Server {
+public class Server implements jLHS.Server<jLHS.http1_1server.ConnectionHandler> {
     protected final ServerSocket serverSocket;
     protected final LinkedList<Thread> serverThreads = new LinkedList<>();
     protected ArrayList<Route> routes;
@@ -84,6 +83,7 @@ public class Server implements jLHS.Server {
         }
         serverSocket.close();
     }
+
 
     @Override
     public void on(Method method, String path, ConnectionHandler handler) {
