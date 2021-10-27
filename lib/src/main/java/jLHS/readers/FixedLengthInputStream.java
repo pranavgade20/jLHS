@@ -3,8 +3,6 @@ package jLHS.readers;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.Objects;
 
 public class FixedLengthInputStream extends SimpleInputStream {
     byte[] buf;
@@ -87,14 +85,22 @@ public class FixedLengthInputStream extends SimpleInputStream {
     }
 
     @Override
-    public long transferTo(OutputStream out) throws IOException {
-        Objects.requireNonNull(out, "out");
-        long transferred = 0L;
+    public int read(byte[] b, int off, int len) throws IOException {
+        // from https://developer.classpath.org/doc/java/io/InputStream-source.html
+        if (off < 0 || len < 0 || b.length - off < len)
+            throw new IndexOutOfBoundsException();
 
-        for(int read; (read = this.read()) >= 0; transferred ++) {
-            out.write(read);
-        }
+        int i, ch;
+        for (i = 0; i < len; ++i)
+            try {
+                if ((ch = read()) < 0) return i == 0 ? -1 : i;
+                b[off + i] = (byte) ch;
+            } catch (IOException ex) {
+                // Only reading the first byte should cause an IOException.
+                if (i == 0) throw ex;
+                return i;
+            }
 
-        return transferred;
+        return i;
     }
 }
