@@ -1,0 +1,51 @@
+package jLHS.readers;
+
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
+public class SimpleInputStream extends FilterInputStream {
+    protected int read_content_count = 0;
+
+    public SimpleInputStream(InputStream in) {
+        super(in);
+    }
+
+    public String readLine() throws IOException {
+        read_content_count = 0;
+        StringBuilder s = new StringBuilder(50);
+        int read;
+        char prev = (char) (read = in.read());
+        char curr = (char) (read = in.read());
+        read_content_count += 2;
+        while (prev != '\r' && curr != '\n') {
+            if (read == -1) throw new IOException("Reached end of stream");
+            s.append(prev);
+            prev = curr;
+            curr = (char) (read = in.read());
+            read_content_count++;
+        }
+        return s.toString();
+    }
+
+    public int getReadContentLength() {
+        return read_content_count;
+    }
+
+//    public SimpleInputStream(InputStream in) {
+//        super(in);
+//    }
+//
+//    public int getPos() {
+//        return pos;
+//    }
+//    public void setPos(int pos) {
+//        this.pos = pos;
+//    }
+//    public int getCount() {
+//        return count;
+//    }
+//    public byte[] getBuf() {
+//        return buf;
+//    }
+}

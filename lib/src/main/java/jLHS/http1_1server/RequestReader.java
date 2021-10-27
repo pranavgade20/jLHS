@@ -4,18 +4,17 @@ import jLHS.Method;
 import jLHS.exceptions.MalformedRequestException;
 import jLHS.exceptions.ProtocolFormatException;
 import jLHS.exceptions.URLFormatException;
+import jLHS.readers.FixedLengthInputStream;
+import jLHS.readers.SimpleInputStream;
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Optional;
 
 public class RequestReader implements jLHS.RequestReader {
-    RequestInputStream inputStream;
+    SimpleInputStream inputStream;
     HashMap<String, String> headers = new HashMap<>();
     String path;
     HashMap<String, String> params = new HashMap<>();
@@ -37,10 +36,10 @@ public class RequestReader implements jLHS.RequestReader {
         return method;
     }
 
-    public RequestReader(RequestInputStream inputStream) throws MalformedRequestException, ProtocolFormatException, IOException {
+    public RequestReader(SimpleInputStream inputStream) throws MalformedRequestException, ProtocolFormatException, IOException {
         this.inputStream = inputStream;
         try {
-            String line = readLine();
+            String line = inputStream.readLine();
             path = line.split(" ")[1];
             method = Method.valueOf(line.split(" ")[0]);
 
@@ -63,7 +62,7 @@ public class RequestReader implements jLHS.RequestReader {
     protected void parseHeaders() throws MalformedRequestException{
         try {
             String line;
-            while ((line = readLine()) != null && !line.isEmpty()) {
+            while ((line = inputStream.readLine()) != null && !line.isEmpty()) {
                 String header = line.split(": ")[0];
                 String value = line.split(": ")[1];
                 headers.put(header, value);
@@ -113,8 +112,8 @@ public class RequestReader implements jLHS.RequestReader {
         }
         read_content_count = 0;
 
-        String line = readLine();
-        while (!line.equals(boundary)) line = readLine();
+        String line = inputStream.readLine();
+        while (!line.equals(boundary)) line = inputStream.readLine();
     }
 
     public Optional<FormData> getFormData(String name) throws IOException, ProtocolFormatException {
@@ -125,11 +124,12 @@ public class RequestReader implements jLHS.RequestReader {
         while (read_content_count < content_length) {
             HashMap<String, String> headers = new HashMap<>();
             String line;
-            while (!(line = readLine()).isEmpty()) {
+            while (!(line = inputStream.readLine()).isEmpty()) {
+                read_content_count += inputStream.getReadContentLength();
                 String[] h = line.split(": ");
                 headers.put(h[0], h[1]);
             }
-            FormData formData = new FormData(headers, new FormDataInputStream((boundary).getBytes(StandardCharsets.US_ASCII)));
+            FormData formData = new FormData(headers, new FixedLengthInputStream((boundary).getBytes(StandardCharsets.US_ASCII), inputStream));
 
             if (!headers.containsKey("Content-Disposition"))
                 throw new ProtocolFormatException("Malformed headers: Expected header describing the type of content.", null);
@@ -153,11 +153,11 @@ public class RequestReader implements jLHS.RequestReader {
         while (read_content_count < content_length) {
             HashMap<String, String> headers = new HashMap<>();
             String line;
-            while (!(line = readLine()).isEmpty()) {
+            while (!(line = inputStream.readLine()).isEmpty()) {
                 String[] h = line.split(": ");
                 headers.put(h[0], h[1]);
             }
-            FormData formData = new FormData(headers, new FormDataInputStream((boundary).getBytes(StandardCharsets.US_ASCII)));
+            FormData formData = new FormData(headers, new FixedLengthInputStream((boundary).getBytes(StandardCharsets.US_ASCII), inputStream));
 
             if (!headers.containsKey("Content-Disposition"))
                 throw new ProtocolFormatException("Malformed headers: Expected header describing the type of content.", null);
@@ -172,9 +172,9 @@ public class RequestReader implements jLHS.RequestReader {
 
     public class FormData {
         HashMap<String, String> headers;
-        FormDataInputStream formData;
+        FixedLengthInputStream formData;
 
-        public FormData(HashMap<String, String> headers, FormDataInputStream formData) {
+        public FormData(HashMap<String, String> headers, FixedLengthInputStream formData) {
             this.formData = formData;
             this.headers = headers;
         }
@@ -183,116 +183,8 @@ public class RequestReader implements jLHS.RequestReader {
             return headers;
         }
 
-        public FormDataInputStream getFormData() {
+        public FixedLengthInputStream getFormData() {
             return formData;
-        }
-    }
-
-    String readLine() throws IOException {
-        StringBuilder s = new StringBuilder(50);
-        int read;
-        char prev = (char) (read = inputStream.read());
-        char curr = (char) (read = inputStream.read());
-        RequestReader.this.read_content_count += 2;
-        while (prev != '\r' && curr != '\n') {
-            if (read == -1) throw new IOException("Reached end of stream");
-            s.append(prev);
-            prev = curr;
-            if (inputStream.getPos() >= inputStream.getCount()) {
-                curr = (char) (read = inputStream.read()); // makes it call fill(), I wish there was a better way here
-            } else {
-                curr = (char) inputStream.getBuf()[inputStream.getPos()];
-                inputStream.setPos(inputStream.getPos()+1);
-            }
-            RequestReader.this.read_content_count++;
-        }
-        return s.toString();
-    }
-
-    public class FormDataInputStream extends InputStream {
-        byte[] buf;
-        int pos = 0;
-        int count = 0;
-        byte[] boundary;
-
-        FormDataInputStream(byte[] boundary) {
-            this.boundary = boundary;
-            buf = new byte[8*1024 + boundary.length];
-        }
-
-        boolean filledCompletely = false;
-        public void fillCompletely() throws IOException {
-            if (filledCompletely) return;
-            synchronized (buf) {
-                ByteArrayOutputStream bos = new ByteArrayOutputStream(); // maybe doing this manually will be faster
-                this.transferTo(bos);
-                bos.write(boundary);
-                this.buf = bos.toByteArray();
-                this.pos = 0;
-                this.count = this.buf.length;
-            }
-            filledCompletely = true;
-        }
-
-        protected void fill(int max_bytes) throws IOException {
-            synchronized (buf) {
-                if (pos == 0 && count == buf.length) {
-                    throw new OutOfMemoryError("Buffer is too small, can't fill anymore."); // This should never happen
-                }
-                if (count + boundary.length > buf.length) {
-                    // we don't need to move data around unless we might run out of buffer space
-                    System.arraycopy(buf, pos, buf, 0, count - pos);
-                    count -= pos;
-                    pos = 0;
-                }
-                if (inputStream.getCount() == inputStream.getPos()) {
-                    if (RequestReader.this.read_content_count == RequestReader.this.content_length) return;
-                    int read = inputStream.read();
-                    RequestReader.this.read_content_count++;
-                    if (read == -1) throw new IOException("Can't read more bytes.");
-                    buf[count++] = (byte) read;
-                } else {
-                    int len = Math.min(max_bytes, Math.min(buf.length - count, inputStream.getCount() - inputStream.getPos()));
-                    System.arraycopy(inputStream.getBuf(), inputStream.getPos(), buf, count, len);
-                    inputStream.setPos(inputStream.getPos()+len);
-                    RequestReader.this.read_content_count += len;
-                    count += len;
-                }
-            }
-        }
-        boolean trailerRead = false;
-        @Override
-        public int read() throws IOException {
-            synchronized (buf) {
-                if (this.pos >= this.count) {
-                    this.fill(boundary.length);
-                    if (this.pos >= this.count) {
-                        return -1;
-                    }
-                }
-
-                byte ret = buf[this.pos];
-                if (ret == boundary[0]) {
-                    //trying to match..
-                    for (int i = 1; i < boundary.length; i++) {
-                        if (this.pos + i >= this.count) this.fill(boundary.length - i);
-                        if (buf[pos + i] != boundary[i]) { // TODO use a better string matching algo, perhaps KMP?
-                            this.pos++;
-                            return ret & 255;
-                        }
-                    }
-                    // we have a match
-                    if (!trailerRead) {
-                        trailerRead = true;
-                        inputStream.read(); // get rid of trailing \r\n or --
-                        inputStream.read();
-                        RequestReader.this.read_content_count += 2;
-                    }
-                    return -1;
-                }
-                this.pos++;
-                return ret & 255;
-            }
         }
     }
 }

@@ -2,6 +2,7 @@ package jLHS.http1_1server;
 
 import jLHS.exceptions.MalformedRequestException;
 import jLHS.exceptions.ProtocolFormatException;
+import jLHS.readers.SimpleInputStream;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -10,13 +11,13 @@ import java.util.NoSuchElementException;
 
 public class RequestBuilder implements Iterable<Request>{
     Socket client;
-    RequestInputStream inputStream;
+    SimpleInputStream inputStream;
     boolean cached = false;
     Request request;
     Iterator<Request> it;
     public RequestBuilder(Socket client) throws IOException {
         this.client = client;
-        inputStream = new RequestInputStream(client.getInputStream());
+        inputStream = new SimpleInputStream(client.getInputStream());
         it = new Iterator<>() {
             @Override
             public boolean hasNext() {

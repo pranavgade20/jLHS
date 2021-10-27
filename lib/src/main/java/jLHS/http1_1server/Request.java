@@ -3,16 +3,15 @@ package jLHS.http1_1server;
 import jLHS.Method;
 import jLHS.exceptions.MalformedRequestException;
 import jLHS.exceptions.ProtocolFormatException;
+import jLHS.readers.SimpleInputStream;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.net.Socket;
 import java.util.HashMap;
 
 public class Request implements jLHS.Request {
     protected RequestReader requestReader;
 
-    public Request(RequestInputStream inputStream) throws IOException, MalformedRequestException, ProtocolFormatException {
+    public Request(SimpleInputStream inputStream) throws IOException, MalformedRequestException, ProtocolFormatException {
         requestReader = new RequestReader(inputStream);
     }
 
