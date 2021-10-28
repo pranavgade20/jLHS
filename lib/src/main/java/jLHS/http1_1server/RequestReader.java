@@ -19,6 +19,7 @@ public class RequestReader implements jLHS.RequestReader {
     String path;
     HashMap<String, String> params = new HashMap<>();
     Method method;
+    boolean gzip = false;
 
     public HashMap<String, String> getHeaders() {
         return headers;
@@ -100,6 +101,7 @@ public class RequestReader implements jLHS.RequestReader {
     protected String boundary;
     protected HashMap<String, FormData> cache = new HashMap<>();
     public void parseFormData() throws ProtocolFormatException, IOException {
+        if ("gzip".equals(headers.get("Content-Encoding"))) gzip = true;
         try {
             boundary = "--" + headers.get("Content-Type").split("=")[1];
         } catch (Exception e) {
@@ -119,7 +121,7 @@ public class RequestReader implements jLHS.RequestReader {
     public Optional<FormData> getFormData(String name) throws IOException, ProtocolFormatException {
         if (cache.containsKey(name)) return Optional.of(cache.get(name));
         for (FormData formData : cache.values()) {
-            formData.getFormData().fillCompletely();
+            read_content_count += formData.getFormData().fillCompletely();
         }
         while (read_content_count < content_length) {
             HashMap<String, String> headers = new HashMap<>();
@@ -140,7 +142,7 @@ public class RequestReader implements jLHS.RequestReader {
             if (content_name.equals(name)) {
                 return Optional.of(formData);
             } else {
-                formData.getFormData().fillCompletely();
+                read_content_count += formData.getFormData().fillCompletely();
             }
         }
         return Optional.empty();
@@ -148,12 +150,13 @@ public class RequestReader implements jLHS.RequestReader {
 
     public void fillCompletely() throws IOException, ProtocolFormatException {
         for (FormData formData : cache.values()) {
-            formData.getFormData().fillCompletely();
+            read_content_count += formData.getFormData().fillCompletely();
         }
         while (read_content_count < content_length) {
             HashMap<String, String> headers = new HashMap<>();
             String line;
             while (!(line = inputStream.readLine()).isEmpty()) {
+                read_content_count += inputStream.getReadContentLength();
                 String[] h = line.split(": ");
                 headers.put(h[0], h[1]);
             }
@@ -165,16 +168,16 @@ public class RequestReader implements jLHS.RequestReader {
             String content_name = Arrays.stream(content_disposition).filter(s -> s.startsWith("name=\"")).findAny().orElseThrow();
             content_name = content_name.substring("name=\"".length(), content_name.length() - 1);
             cache.put(content_name, formData);
-            formData.getFormData().fillCompletely();
+            read_content_count += formData.getFormData().fillCompletely();
         }
 
     }
 
     public class FormData {
         HashMap<String, String> headers;
-        FixedLengthInputStream formData;
+        SimpleInputStream formData;
 
-        public FormData(HashMap<String, String> headers, FixedLengthInputStream formData) {
+        public FormData(HashMap<String, String> headers, SimpleInputStream formData) {
             this.formData = formData;
             this.headers = headers;
         }
@@ -183,7 +186,7 @@ public class RequestReader implements jLHS.RequestReader {
             return headers;
         }
 
-        public FixedLengthInputStream getFormData() {
+        public SimpleInputStream getFormData() {
             return formData;
         }
     }

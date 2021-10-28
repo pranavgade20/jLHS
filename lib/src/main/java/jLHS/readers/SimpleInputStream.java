@@ -3,6 +3,7 @@ package jLHS.readers;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 public class SimpleInputStream extends FilterInputStream {
     protected int read_content_count = 0;
@@ -32,20 +33,8 @@ public class SimpleInputStream extends FilterInputStream {
         return read_content_count;
     }
 
-//    public SimpleInputStream(InputStream in) {
-//        super(in);
-//    }
-//
-//    public int getPos() {
-//        return pos;
-//    }
-//    public void setPos(int pos) {
-//        this.pos = pos;
-//    }
-//    public int getCount() {
-//        return count;
-//    }
-//    public byte[] getBuf() {
-//        return buf;
-//    }
+    public long fillCompletely() throws IOException {
+        System.err.println("Are you sure you want to discard this stream tho");
+        return this.transferTo(OutputStream.nullOutputStream());
+    }
 }

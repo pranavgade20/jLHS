@@ -17,8 +17,8 @@ public class FixedLengthInputStream extends SimpleInputStream {
     }
 
     boolean filledCompletely = false;
-    public void fillCompletely() throws IOException {
-        if (filledCompletely) return;
+    public long fillCompletely() throws IOException {
+        if (filledCompletely) return 0;
         synchronized (buf) {
             ByteArrayOutputStream bos = new ByteArrayOutputStream(); // maybe doing this manually will be faster
             this.transferTo(bos);
@@ -28,6 +28,8 @@ public class FixedLengthInputStream extends SimpleInputStream {
             this.count = this.buf.length;
         }
         filledCompletely = true;
+
+        return read_content_count;
     }
 
     protected void fill(int max_bytes) throws IOException {
