@@ -5,6 +5,7 @@ import jLHS.exceptions.MalformedRequestException;
 import jLHS.exceptions.ProtocolFormatException;
 import jLHS.exceptions.URLFormatException;
 import jLHS.readers.FixedLengthInputStream;
+import jLHS.readers.GzipInputStream;
 import jLHS.readers.SimpleInputStream;
 
 import java.io.IOException;
@@ -98,12 +99,12 @@ public class RequestReader implements jLHS.RequestReader {
 
     protected long content_length;
     long read_content_count = 0;
-    protected String boundary;
+    protected String boundary = null;
     protected HashMap<String, FormData> cache = new HashMap<>();
     public void parseFormData() throws ProtocolFormatException, IOException {
         if ("gzip".equals(headers.get("Content-Encoding"))) gzip = true;
         try {
-            boundary = "--" + headers.get("Content-Type").split("=")[1];
+            if (!gzip) boundary = "--" + headers.get("Content-Type").split("=")[1];
         } catch (Exception e) {
             throw new ProtocolFormatException("Malformed headers: Expected header describing the boundary of data being sent.", e);
         }
@@ -114,16 +115,26 @@ public class RequestReader implements jLHS.RequestReader {
         }
         read_content_count = 0;
 
-        String line = inputStream.readLine();
-        while (!line.equals(boundary)) line = inputStream.readLine();
+        if (!gzip) while (!inputStream.readLine().equals(boundary)) ;
     }
 
     public Optional<FormData> getFormData(String name) throws IOException, ProtocolFormatException {
         if (cache.containsKey(name)) return Optional.of(cache.get(name));
+        return findFormData(name);
+    }
+
+    public void fillCompletely() throws IOException, ProtocolFormatException {
+        findFormData(null);
+    }
+
+    protected Optional<FormData> findFormData(String name) throws IOException, ProtocolFormatException {
         for (FormData formData : cache.values()) {
             read_content_count += formData.getFormData().fillCompletely();
         }
         while (read_content_count < content_length) {
+            if (gzip) {
+                return Optional.of(new FormData(new HashMap<>(), new GzipInputStream(inputStream)));
+            }
             HashMap<String, String> headers = new HashMap<>();
             String line;
             while (!(line = inputStream.readLine()).isEmpty()) {
@@ -146,31 +157,6 @@ public class RequestReader implements jLHS.RequestReader {
             }
         }
         return Optional.empty();
-    }
-
-    public void fillCompletely() throws IOException, ProtocolFormatException {
-        for (FormData formData : cache.values()) {
-            read_content_count += formData.getFormData().fillCompletely();
-        }
-        while (read_content_count < content_length) {
-            HashMap<String, String> headers = new HashMap<>();
-            String line;
-            while (!(line = inputStream.readLine()).isEmpty()) {
-                read_content_count += inputStream.getReadContentLength();
-                String[] h = line.split(": ");
-                headers.put(h[0], h[1]);
-            }
-            FormData formData = new FormData(headers, new FixedLengthInputStream((boundary).getBytes(StandardCharsets.US_ASCII), inputStream));
-
-            if (!headers.containsKey("Content-Disposition"))
-                throw new ProtocolFormatException("Malformed headers: Expected header describing the type of content.", null);
-            String[] content_disposition = headers.get("Content-Disposition").split("; ");
-            String content_name = Arrays.stream(content_disposition).filter(s -> s.startsWith("name=\"")).findAny().orElseThrow();
-            content_name = content_name.substring("name=\"".length(), content_name.length() - 1);
-            cache.put(content_name, formData);
-            read_content_count += formData.getFormData().fillCompletely();
-        }
-
     }
 
     public class FormData {

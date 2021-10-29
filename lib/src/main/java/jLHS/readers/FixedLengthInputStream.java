@@ -9,6 +9,7 @@ public class FixedLengthInputStream extends SimpleInputStream {
     int pos = 0;
     int count = 0;
     byte[] boundary;
+    boolean filledCompletely = false;
 
     public FixedLengthInputStream(byte[] boundary, InputStream inputStream) {
         super(inputStream);
@@ -16,7 +17,6 @@ public class FixedLengthInputStream extends SimpleInputStream {
         buf = new byte[8*1024 + boundary.length];
     }
 
-    boolean filledCompletely = false;
     public long fillCompletely() throws IOException {
         if (filledCompletely) return 0;
         synchronized (buf) {
