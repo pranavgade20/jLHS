@@ -4,8 +4,13 @@ import jLHS.Method;
 import jLHS.exceptions.MalformedRequestException;
 import jLHS.exceptions.ProtocolFormatException;
 import jLHS.exceptions.URLFormatException;
+import jLHS.readers.SimpleInputStream;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -37,7 +42,7 @@ public class RequestReader extends BufferedInputStream implements jLHS.RequestRe
         super(in);
         try {
             String line = readLine();
-            path = line.split(" ")[1];
+            path = URLDecoder.decode(line.split(" ")[1]);
             method = Method.valueOf(line.split(" ")[0]);
 
             parseParams(path);
@@ -111,11 +116,6 @@ public class RequestReader extends BufferedInputStream implements jLHS.RequestRe
 
         String line = readLine();
         while (!line.equals(boundary)) line = readLine();
-//        try {
-//
-//        } catch (Exception e) {
-//            throw new ProtocolFormatException("Malformed request: bad POST request body.", e);
-//        }
     }
 
     public Optional<FormData> getFormData(String name) throws IOException, ProtocolFormatException {
@@ -135,7 +135,11 @@ public class RequestReader extends BufferedInputStream implements jLHS.RequestRe
             if (!headers.containsKey("Content-Disposition"))
                 throw new ProtocolFormatException("Malformed headers: Expected header describing the type of content.", null);
             String[] content_disposition = headers.get("Content-Disposition").split("; ");
-            String content_name = Arrays.stream(content_disposition).filter(s -> s.startsWith("name=\"")).findAny().orElseThrow();
+            String content_name =
+                    Arrays.stream(content_disposition)
+                    .filter(s -> s.startsWith("name=\""))
+                    .findAny()
+                    .orElseThrow(() -> new ProtocolFormatException("Content name expected, but not found", null));
             content_name = content_name.substring("name=\"".length(), content_name.length() - 1);
             cache.put(content_name, formData);
             if (content_name.equals(name)) {
@@ -201,7 +205,7 @@ public class RequestReader extends BufferedInputStream implements jLHS.RequestRe
             if (filledCompletely) return;
             synchronized (buf) {
                 ByteArrayOutputStream bos = new ByteArrayOutputStream(); // maybe doing this manually will be faster
-                this.transferTo(bos);
+                SimpleInputStream.transfer(this, bos);
                 bos.write(boundary);
                 this.buf = bos.toByteArray();
                 this.pos = 0;

@@ -1,11 +1,15 @@
 package jLHS.http1_1server;
 
 import jLHS.exceptions.ProtocolFormatException;
+import jLHS.readers.SimpleInputStream;
 import jLHS.writers.ChunkedOutputStream;
 import jLHS.writers.GzipOutputStream;
 import jLHS.writers.SimpleOutputStream;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.HashSet;
 
@@ -127,7 +131,7 @@ public class Response implements jLHS.Response {
         }
 
         writer.flush();
-        is.transferTo(outputStream);
+        SimpleInputStream.transfer(is, outputStream);
     }
 
     /**

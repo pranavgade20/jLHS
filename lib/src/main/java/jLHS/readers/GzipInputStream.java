@@ -1,6 +1,7 @@
 package jLHS.readers;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.zip.GZIPInputStream;
@@ -19,7 +20,12 @@ public class GzipInputStream extends SimpleInputStream {
     @Override
     public long fillCompletely() throws IOException {
         if (filled) return 0;
-        super.in = new ByteArrayInputStream(super.in.readAllBytes());
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        int read;
+        for(byte[] buffer = new byte[8192]; (read = in.read(buffer, 0, 8192)) >= 0;) {
+            bos.write(buffer, 0, read);
+        }
+        super.in = new ByteArrayInputStream(bos.toByteArray());
         filled = true;
         return getReadContentLength();
     }

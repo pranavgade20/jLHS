@@ -9,6 +9,7 @@ import jLHS.readers.GzipInputStream;
 import jLHS.readers.SimpleInputStream;
 
 import java.io.IOException;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -21,6 +22,7 @@ public class RequestReader implements jLHS.RequestReader {
     HashMap<String, String> params = new HashMap<>();
     Method method;
     boolean gzip = false;
+
 
     public HashMap<String, String> getHeaders() {
         return headers;
@@ -42,7 +44,7 @@ public class RequestReader implements jLHS.RequestReader {
         this.inputStream = inputStream;
         try {
             String line = inputStream.readLine();
-            path = line.split(" ")[1];
+            path = URLDecoder.decode(line.split(" ")[1]);
             method = Method.valueOf(line.split(" ")[0]);
 
             parseParams(path);
@@ -147,7 +149,11 @@ public class RequestReader implements jLHS.RequestReader {
             if (!headers.containsKey("Content-Disposition"))
                 throw new ProtocolFormatException("Malformed headers: Expected header describing the type of content.", null);
             String[] content_disposition = headers.get("Content-Disposition").split("; ");
-            String content_name = Arrays.stream(content_disposition).filter(s -> s.startsWith("name=\"")).findAny().orElseThrow();
+            String content_name =
+                    Arrays.stream(content_disposition)
+                    .filter(s -> s.startsWith("name=\""))
+                    .findAny()
+                    .orElseThrow(() -> new ProtocolFormatException("Content name expected, but not found", null));
             content_name = content_name.substring("name=\"".length(), content_name.length() - 1);
             cache.put(content_name, formData);
             if (content_name.equals(name)) {

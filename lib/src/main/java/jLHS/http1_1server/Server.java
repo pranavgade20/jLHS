@@ -90,6 +90,14 @@ public class Server implements jLHS.Server<jLHS.http1_1server.ConnectionHandler>
         routes.add(new Route(method, path.split("\\?")[0], handler));
     }
 
+    public void get(String path, ConnectionHandler handler) {
+        this.on(Method.GET, path, handler);
+    }
+
+    public void post(String path, ConnectionHandler handler) {
+        this.on(Method.POST, path, handler);
+    }
+
     class ServerThread extends Thread {
         @Override
         public void run() {

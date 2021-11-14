@@ -18,7 +18,7 @@ public class RequestBuilder implements Iterable<Request>{
     public RequestBuilder(Socket client) throws IOException {
         this.client = client;
         inputStream = new SimpleInputStream(client.getInputStream());
-        it = new Iterator<>() {
+        it = new Iterator<Request>() {
             @Override
             public boolean hasNext() {
                 if (cached) return true;

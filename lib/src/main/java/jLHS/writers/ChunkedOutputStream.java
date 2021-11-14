@@ -30,7 +30,11 @@ public class ChunkedOutputStream extends SimpleOutputStream {
     public synchronized void write(byte[] b, int off, int len) throws IOException {
         if (len >= this.buf.length) {
             this.flushBuffer();
-            this.out.write(b, off, len);
+            while (off < len) {
+                this.write(b, off, Math.min(this.buf.length - 1, len));
+                off += this.buf.length - 1;
+                len -= this.buf.length - 1;
+            }
         } else {
             if (len > this.buf.length - this.count) {
                 this.flushBuffer();

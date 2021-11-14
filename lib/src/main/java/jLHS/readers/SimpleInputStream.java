@@ -4,6 +4,7 @@ import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Objects;
 
 public class SimpleInputStream extends FilterInputStream {
     protected int read_content_count = 0;
@@ -35,6 +36,26 @@ public class SimpleInputStream extends FilterInputStream {
 
     public long fillCompletely() throws IOException {
         System.err.println("Are you sure you want to discard this stream tho");
-        return this.transferTo(OutputStream.nullOutputStream());
+        return this.transferTo(new OutputStream() {
+            @Override
+            public void write(int b) {
+            }
+        });
+    }
+
+    public long transferTo(OutputStream out) throws IOException {
+        return transfer(this, out);
+    }
+
+    public static long transfer(InputStream in, OutputStream out) throws IOException {
+        Objects.requireNonNull(out, "out");
+        long transferred = 0L;
+
+        int read;
+        for(byte[] buffer = new byte[8192]; (read = in.read(buffer, 0, 8192)) >= 0; transferred += (long)read) {
+            out.write(buffer, 0, read);
+        }
+
+        return transferred;
     }
 }
