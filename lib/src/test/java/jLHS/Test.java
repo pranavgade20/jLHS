@@ -3,7 +3,11 @@ package jLHS;
 import jLHS.exceptions.ProtocolFormatException;
 import jLHS.http1_1server.Server;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.net.Socket;
 
 public class Test {
     public static void main(String[] args) throws IOException {
@@ -34,5 +38,13 @@ public class Test {
         server.start();
 
         System.out.println("started server");
+
+        Socket client = new Socket("localhost", 8080);
+        var out = new PrintWriter(new BufferedOutputStream(client.getOutputStream()));
+        out.print("POST /p\r\n");
+        out.flush();
+
     }
+
+
 }

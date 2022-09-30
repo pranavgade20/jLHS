@@ -32,20 +32,4 @@ public class SimpleInputStream extends FilterInputStream {
         return read_content_count;
     }
 
-//    public SimpleInputStream(InputStream in) {
-//        super(in);
-//    }
-//
-//    public int getPos() {
-//        return pos;
-//    }
-//    public void setPos(int pos) {
-//        this.pos = pos;
-//    }
-//    public int getCount() {
-//        return count;
-//    }
-//    public byte[] getBuf() {
-//        return buf;
-//    }
 }
